@@ -69,23 +69,32 @@ class AuthController extends Controller
         );
     }
 
-    public function login(Request $request)
-    {
-        if (!Auth::attempt($request->only('email', 'password')))
+    public function login (Request $request) {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|string|email|max:255',
+            'password' => 'required',
+        ]);
+        if ($validator->fails())
         {
-            return $this->failure('Unauthorized');
+            return response(['errors'=>$validator->errors()->all()], 422);
         }
-
-        $user = User::where('email', $request['email'])->firstOrFail();
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-        return $this->success(
-            'Hi '.$user->name.', welcome to home',
-            [
-                'user' => new UserResource($user),
-                'token' => $token,
-            ]
-        );
+        $user = User::where('email', $request->email)->first();
+        if ($user) {
+            if (Hash::check($request->password, $user->password)) {
+                $token = $user->createToken('auth_token')->plainTextToken;
+                return $this->success(
+                    'Hi '.$user->name.', welcome to home',
+                    [
+                        'user' => new UserResource($user),
+                        'token' => $token,
+                    ]
+                );
+            } else {
+                return $this->failure('Unauthorized.');
+            }
+        } else {
+            return $this->failure('Unauthorized.');
+        }
     }
 
     public function me(Request $request)
@@ -96,6 +105,16 @@ class AuthController extends Controller
                 'user' => new UserResource($request->user()),
             ]
         );
+    }
+
+    public function isAdmin()
+    {
+            return $this->success(
+                'Hi welcome to home',
+                [
+                    'isAdmin' => Auth::user()->role == 'admin' ? true : false,
+                ]
+            );
     }
 
     public function profile(Request $request)
